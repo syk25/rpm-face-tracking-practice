@@ -1,24 +1,34 @@
-import React from 'react';
-import logo from './logo.svg';
+import { useEffect } from 'react';
 import './App.css';
 
+let video: HTMLVideoElement;
+
 function App() {
+  /*  */
+  const handleOnChange = () => {
+
+  }
+
+    /* 비디오 설정 */
+  const setup = () => {
+    video = document.getElementById('video') as HTMLVideoElement;
+    navigator.mediaDevices.getUserMedia({
+      video: { width: 1280, height: 720 }
+    }).then((stream) => {
+      video.srcObject = stream;
+    })
+  }
+
+  /*  */
+  useEffect(() => {
+    setup();
+  }, [])
+
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <input type="text" placeholder='Enter your RPM avatar URL' onChange={handleOnChange}/>
+      <video autoPlay id='video' />
     </div>
   );
 }
