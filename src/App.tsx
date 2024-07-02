@@ -1,13 +1,16 @@
 import { useEffect } from 'react';
 import './App.css';
-import { Canvas, useGraph } from '@react-three/fiber';
-import { Color } from 'three';
+import { Canvas, useFrame, useGraph } from '@react-three/fiber';
+import { Color, Euler, Matrix4 } from 'three';
 import { useGLTF } from '@react-three/drei';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
+/* 타입지정 */
 let video: HTMLVideoElement;
 let faceLandmarker: FaceLandmarker;
 let lastVideoTime = -1;
+let headMesh: any;
+let rotation: Euler;
 
 function App() {
   /*  */
@@ -47,10 +50,12 @@ function App() {
     let startTimeMs = performance.now();
     if (lastVideoTime !== video.currentTime) {
       lastVideoTime = video.currentTime;
-      const result = faceLandmarker.detectForVideo(video, startTimeMs)
-      console.log(result)
+      const result = faceLandmarker.detectForVideo(video, startTimeMs);
+      if (result.facialTransformationMatrixes && result.facialTransformationMatrixes.length > 0) {
+        const matrix = new Matrix4().fromArray(result.facialTransformationMatrixes[0].data);
+        rotation = new Euler().setFromRotationMatrix(matrix);
+      }
     }
-
     requestAnimationFrame(predict);
   }
 
@@ -85,8 +90,18 @@ function App() {
 
 /* 아바타 컴포넌트 */
 function Avatar() {
-  const avatar = useGLTF("https://models.readyplayer.me/6682c315649e11cdd6dd8a8a.glb?morphTargets=ARKit")
+  const avatar = useGLTF("https://models.readyplayer.me/6682c315649e11cdd6dd8a8a.glb?morphTargets=ARKit&textureAtlas=1024")
   const { nodes } = useGraph(avatar.scene)
+  useEffect(() => {
+    headMesh = nodes.Wolf3D_Avatar
+  }, [nodes])
+
+  useFrame((_, delta) => {
+    nodes.Head.rotation.set(rotation.x / 3, rotation.y / 3, rotation.z / 3);
+    nodes.Neck.rotation.set(rotation.x / 3, rotation.y / 3, rotation.z / 3);
+    nodes.Spine1.rotation.set(rotation.x / 3, rotation.y / 3, rotation.z / 3);
+  })
+
   return <primitive object={avatar.scene} position={[0, -1.65, 4]} />
 }
 
