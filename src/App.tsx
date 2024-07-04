@@ -1,21 +1,24 @@
-import { useEffect } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import './App.css';
 import { Canvas, useFrame, useGraph } from '@react-three/fiber';
-import { Color, Euler, Matrix4 } from 'three';
+import { Color, Euler, Matrix4, SkinnedMesh } from 'three';
 import { useGLTF } from '@react-three/drei';
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { Category, FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 /* 타입지정 */
 let video: HTMLVideoElement;
 let faceLandmarker: FaceLandmarker;
 let lastVideoTime = -1;
-let headMesh: any;
+let headMesh: SkinnedMesh;
 let rotation: Euler;
+let blendshapes: Category[] = [];
 
+/* App 컴포넌트 */
 function App() {
   /*  */
-  const handleOnChange = () => {
-
+  const [url, setUrl] = useState<string>("https://models.readyplayer.me/6682c315649e11cdd6dd8a8a.glb")
+  const handleOnChange = (event: any) => {
+    setUrl(event.target.value)
   }
 
 
@@ -51,9 +54,11 @@ function App() {
     if (lastVideoTime !== video.currentTime) {
       lastVideoTime = video.currentTime;
       const result = faceLandmarker.detectForVideo(video, startTimeMs);
-      if (result.facialTransformationMatrixes && result.facialTransformationMatrixes.length > 0) {
+      if (result.facialTransformationMatrixes && result.facialTransformationMatrixes.length > 0 && result.faceBlendshapes && result.faceBlendshapes.length > 0) {
         const matrix = new Matrix4().fromArray(result.facialTransformationMatrixes[0].data);
         rotation = new Euler().setFromRotationMatrix(matrix);
+
+        blendshapes = result.faceBlendshapes[0].categories;
       }
     }
     requestAnimationFrame(predict);
@@ -81,7 +86,7 @@ function App() {
         <pointLight position={[1, 1, 1]} color={new Color(1, 0, 0)} intensity={0.5} />
         <pointLight position={[-1, 0, 1]} color={new Color(0, 1, 0)} intensity={0.5} />
 
-        <Avatar />
+        <Avatar url={url} />
       </Canvas>
 
     </div>
@@ -89,14 +94,24 @@ function App() {
 }
 
 /* 아바타 컴포넌트 */
-function Avatar() {
-  const avatar = useGLTF("https://models.readyplayer.me/6682c315649e11cdd6dd8a8a.glb?morphTargets=ARKit&textureAtlas=1024")
+function Avatar({ url }: { url: string }) {
+  const avatar = useGLTF(`${ url }?morphTargets=ARKit&textureAtlas=1024`)
   const { nodes } = useGraph(avatar.scene)
   useEffect(() => {
-    headMesh = nodes.Wolf3D_Avatar
+    headMesh = nodes.Wolf3D_Avatar as SkinnedMesh
   }, [nodes])
 
   useFrame((_, delta) => {
+    if (headMesh !== null) {
+      blendshapes.forEach((blendshape) => {
+
+        let index = headMesh.morphTargetDictionary![blendshape.categoryName];
+        if (index >= 0) {
+          headMesh.morphTargetInfluences![index] = blendshape.score;
+        }
+      })
+    }
+
     nodes.Head.rotation.set(rotation.x / 3, rotation.y / 3, rotation.z / 3);
     nodes.Neck.rotation.set(rotation.x / 3, rotation.y / 3, rotation.z / 3);
     nodes.Spine1.rotation.set(rotation.x / 3, rotation.y / 3, rotation.z / 3);
